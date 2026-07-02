@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#145236">
-<title>Quadras de Tênis do Cire — Contribuições</title>
+<title>Projeto Quadras Vivas — Cire Uemg Passos/MG</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
@@ -69,7 +69,7 @@
   details.bloco td,details.bloco th{white-space:normal}
   details.bloco td:first-child{white-space:nowrap}
   details.bloco td:last-child{white-space:nowrap;font-weight:700;color:var(--bad)}
-  ul.nomes{list-style:none;padding:6px 14px 12px;font-size:.85rem;columns:2;column-gap:18px}
+  ul.nomes{list-style:none;padding:6px 14px 12px;font-size:.85rem}
   ul.nomes li{padding:3px 0;border-bottom:1px dashed var(--line);break-inside:avoid}
   .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10;overflow-y:auto;padding:16px 10px}
   .overlay.open{display:flex;align-items:flex-start;justify-content:center}
@@ -123,15 +123,14 @@
     .card{padding:10px 6px}
     .card .value{font-size:.95rem}
     .form-grid{grid-template-columns:1fr}
-    ul.nomes{columns:1}
   }
 </style>
 </head>
 <body>
 <header>
   <button id="themeBtn" title="Alternar fundo claro/escuro" onclick="toggleTheme()">🌙</button>
-  <h1>🎾 Quadras de Tênis do Cire</h1>
-  <p>Contribuições e transparência de gastos — Passos/MG</p>
+  <h1>🎾 PROJETO QUADRAS VIVAS</h1>
+  <p>Site para automatização das contribuições voluntárias e Transparência dos Gastos para os Tenistas do Cire Uemg Passos/MG</p>
   <p style="margin-top:5px"><span id="adminLink">Área do gestor</span></p>
 </header>
 
@@ -357,16 +356,23 @@ async function loadDashboard(){
     g.rows.push({...r, receitasT: receitas, despesasT: despesas, contrib, caixaT: caixa});
   }
   let html = '';
+  const hoje2 = new Date();
+  const atualOrd = hoje2.getFullYear()*6 + Math.ceil((hoje2.getMonth()+1)/2);
   for(const g of grupos){
     const recA = g.rows.reduce((s,r)=>s+r.receitasT,0);
     const despA = g.rows.reduce((s,r)=>s+r.despesasT,0);
     const caixaFim = g.rows[g.rows.length-1].caixaT;
+    // média de contribuintes do ano: só bimestres concluídos (sem o corrente e futuros), sem rifas
+    const concl = g.rows.filter(r=>r.tipo==='Contribuições' && ordDe(r.bimestre) < atualOrd);
+    const mediaA = concl.length
+      ? concl.reduce((s,r)=>s + r.receitasT/(parseInt(r.bimestre.match(/\d{4}/)[0])<=2023?50:60), 0)/concl.length
+      : null;
     const aberto = anosAbertos.has(g.key);
     html += `<tr class="yr ${aberto?'open':''}" data-yr="${g.key}" onclick="toggleYear('${g.key}')">
       <td><span class="seta">▶</span>${g.key}</td>
       <td class="pos">${brl(recA)}</td>
       <td class="${despA>0?'neg':''}">${brl(despA)}</td>
-      <td class="hide-sm"></td>
+      <td class="hide-sm">${mediaA!==null?'média '+mediaA.toLocaleString('pt-BR',{maximumFractionDigits:1}):'—'}</td>
       <td><strong>${brl(caixaFim)}</strong></td></tr>`;
     for(const r of g.rows){
       html += `<tr class="bim-row ${aberto?'show':''}" data-yr="${g.key}">
