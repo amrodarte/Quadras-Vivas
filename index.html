@@ -65,6 +65,8 @@
   details.bloco summary::after{content:'▼';font-size:.7rem;color:var(--muted);transition:transform .2s;flex-shrink:0}
   details.bloco[open] summary::after{transform:rotate(180deg)}
   details.bloco .conteudo{border-top:1px solid var(--line)}
+  details.bloco details.bloco{margin:8px;border-radius:10px;background:var(--soft)}
+  details.bloco details.bloco summary{padding:11px 12px;font-size:.82rem}
   details.bloco table{min-width:520px;font-size:.78rem}
   details.bloco td,details.bloco th{white-space:normal}
   details.bloco td:first-child{white-space:nowrap}
@@ -156,7 +158,7 @@
   <h2>Gastos Detalhados</h2>
   <div id="gastosBlocos"><p class="muted">Carregando…</p></div>
 
-  <h2>Contribuintes 2026 (aprovados pelo site)</h2>
+  <h2>Contribuintes (aprovados pelo site)</h2>
   <div id="contribBlocos"><p class="muted">Carregando…</p></div>
 </main>
 
@@ -388,47 +390,65 @@ async function loadDashboard(){
   document.getElementById('cRec').textContent = brl(rec26);
   document.getElementById('cDesp').textContent = brl(desp26);
 
-  /* --- Gastos Detalhados: um bloco colapsável por bimestre, com tabela --- */
+  /* --- Gastos Detalhados: ano → bimestre → tabela --- */
   const porBimG = {};
   (gastos||[]).forEach(g => (porBimG[g.bimestre]=porBimG[g.bimestre]||[]).push(g));
   const gb = document.getElementById('gastosBlocos');
-  const bimsG = Object.keys(porBimG).sort((a,b)=>ordBim(a)-ordBim(b));
-  gb.innerHTML = bimsG.length
-    ? bimsG.map(b=>{
-        const lst = porBimG[b];
-        const tot = lst.reduce((s,g)=>s+Number(g.valor),0);
+  const anoDe = b => b==='2020/2021' ? '2020/2021' : (b.match(/\((\d{4})\)/)||[])[1];
+  const anosG = {};
+  Object.keys(porBimG).forEach(b => { const a=anoDe(b); (anosG[a]=anosG[a]||[]).push(b); });
+  gb.innerHTML = Object.keys(anosG).length
+    ? Object.keys(anosG).sort().map(ano=>{
+        const bimsAno = anosG[ano].sort((a,b)=>ordBim(a)-ordBim(b));
+        const totAno = bimsAno.reduce((s,b)=>s+porBimG[b].reduce((x,g)=>x+Number(g.valor),0),0);
+        const qtdAno = bimsAno.reduce((s,b)=>s+porBimG[b].length,0);
         return `<details class="bloco">
-          <summary><span>Detalhamento de Gastos do Bimestre ${numBim(b)} — ${b}</span><span class="muted">${lst.length} · ${brl(tot)}</span></summary>
-          <div class="conteudo tbl-wrap" style="border-radius:0 0 12px 12px;border:none">
-            <table>
-              <thead><tr><th>Data</th><th style="text-align:left">Descrição do serviço</th><th style="text-align:left">Fornecedor</th><th>Valor</th></tr></thead>
-              <tbody>${lst.map(g=>`<tr>
-                <td>${dataBR(g.data)}</td>
-                <td style="text-align:left">${g.descricao?esc(g.descricao):'<span class="muted">—</span>'}</td>
-                <td style="text-align:left">${esc(g.fornecedor)}</td>
-                <td>${g.valor<0?'+ '+brl(-g.valor):'− '+brl(g.valor)}</td></tr>`).join('')}
-              <tr><td colspan="3" style="text-align:right;font-weight:700">Total do bimestre</td><td>− ${brl(tot)}</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <summary><span>Gastos de ${ano}</span><span class="muted">${qtdAno} · ${brl(totAno)}</span></summary>
+          <div class="conteudo" style="padding-bottom:2px">${bimsAno.map(b=>{
+            const lst = porBimG[b];
+            const tot = lst.reduce((s,g)=>s+Number(g.valor),0);
+            const rotulo = b==='2020/2021' ? 'Residual 2020/2021' : `Detalhamento de Gastos do Bimestre ${numBim(b)} — ${b}`;
+            return `<details class="bloco">
+              <summary><span>${rotulo}</span><span class="muted">${lst.length} · ${brl(tot)}</span></summary>
+              <div class="conteudo tbl-wrap" style="border-radius:0 0 10px 10px;border:none">
+                <table>
+                  <thead><tr><th>Data</th><th style="text-align:left">Descrição do serviço</th><th style="text-align:left">Fornecedor</th><th>Valor</th></tr></thead>
+                  <tbody>${lst.map(g=>`<tr>
+                    <td>${dataBR(g.data)}</td>
+                    <td style="text-align:left">${g.descricao?esc(g.descricao):'<span class="muted">—</span>'}</td>
+                    <td style="text-align:left">${esc(g.fornecedor)}</td>
+                    <td>${g.valor<0?'+ '+brl(-g.valor):'− '+brl(g.valor)}</td></tr>`).join('')}
+                  <tr><td colspan="3" style="text-align:right;font-weight:700">Total do bimestre</td><td>− ${brl(tot)}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </details>`;}).join('')}</div>
         </details>`;
       }).join('')
     : '<p class="muted">Nenhum gasto lançado ainda.</p>';
 
-  /* --- Contribuintes: bloco colapsável por bimestre, numerados por ordem de aprovação --- */
+  /* --- Contribuintes: ano → bimestre, numerados por ordem de aprovação --- */
   const porBimC = {};
   (pag||[]).forEach(p => p.bimestres.forEach(b => { (porBimC[b]=porBimC[b]||[]).push(p.nome); }));
   listasPorBim = porBimC;
   const cb = document.getElementById('contribBlocos');
-  const bimsC = Object.keys(porBimC).sort((a,b)=>ordBim(a)-ordBim(b));
-  cb.innerHTML = bimsC.length
-    ? bimsC.map(b=>`<details class="bloco">
-        <summary><span>${b}</span><span class="muted">${porBimC[b].length} contribuinte(s)</span></summary>
-        <div class="conteudo">
-          <ul class="nomes">${porBimC[b].map((n,i)=>`<li>${i+1}. ${esc(n)}</li>`).join('')}</ul>
-          <div style="padding:0 14px 12px"><button class="btn secondary" style="margin-top:0" onclick="copiarLista('${b}')">📋 Copiar lista para o WhatsApp</button></div>
-        </div>
-      </details>`).join('')
+  const anosC = {};
+  Object.keys(porBimC).forEach(b => { const a=(b.match(/\((\d{4})\)/)||[])[1]||b; (anosC[a]=anosC[a]||[]).push(b); });
+  cb.innerHTML = Object.keys(anosC).length
+    ? Object.keys(anosC).sort().map(ano=>{
+        const bimsAno = anosC[ano].sort((a,b)=>ordBim(a)-ordBim(b));
+        const totAno = bimsAno.reduce((s,b)=>s+porBimC[b].length,0);
+        return `<details class="bloco">
+          <summary><span>Contribuintes de ${ano}</span><span class="muted">${totAno} registro(s)</span></summary>
+          <div class="conteudo" style="padding-bottom:2px">${bimsAno.map(b=>`<details class="bloco">
+            <summary><span>${b}</span><span class="muted">${porBimC[b].length} contribuinte(s)</span></summary>
+            <div class="conteudo">
+              <ul class="nomes">${porBimC[b].map((n,i)=>`<li>${i+1}. ${esc(n)}</li>`).join('')}</ul>
+              <div style="padding:0 14px 12px"><button class="btn secondary" style="margin-top:0" onclick="copiarLista('${b}')">📋 Copiar lista para o WhatsApp</button></div>
+            </div>
+          </details>`).join('')}</div>
+        </details>`;
+      }).join('')
     : '<p class="muted">Ainda não há contribuições aprovadas pelo site. Seja o primeiro!</p>';
 }
 
