@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#145236">
+<title>Quadras de Tênis do Cire — Contribuições</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --clay:#c0552b; --clay-dark:#9c3f1c; --green:#1e6b48; --green-dark:#145236;
+    --bg:#f6f2ec; --card:#ffffff; --line:#e6ddd2; --txt:#2b2723; --muted:#8a7f73;
+    --soft:#faf7f2; --soft2:#eef7f1;
+    --ok:#1e8e5a; --bad:#c0392b;
+    --shadow:0 2px 8px rgba(0,0,0,.15);
+  }
+  html[data-theme="dark"]{
+    --clay:#e07048; --clay-dark:#c0552b; --green:#3da674; --green-dark:#1e6b48;
+    --bg:#131211; --card:#1e1c1a; --line:#37332f; --txt:#eae6e1; --muted:#a39a8f;
+    --soft:#26231f; --soft2:#1c2822;
+    --ok:#4cc38a; --bad:#e06555;
+    --shadow:0 2px 8px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);line-height:1.5;transition:background .25s,color .25s}
+  header{background:linear-gradient(135deg,#0e3b27,#1e6b48);color:#fff;padding:22px 56px 20px 16px;text-align:center;position:relative}
+  header h1{font-size:1.25rem;letter-spacing:.4px}
+  header p{opacity:.85;font-size:.82rem;margin-top:3px}
+  #themeBtn{position:absolute;top:12px;right:12px;width:40px;height:40px;border-radius:50%;
+    border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:#fff;
+    font-size:1.15rem;cursor:pointer;line-height:1}
+  #themeBtn:active{transform:scale(.92)}
+  main,#adminPage{max-width:960px;margin:0 auto;padding:14px 12px 20px}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 8px;text-align:center}
+  .card .label{font-size:.62rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+  .card .value{font-size:1.05rem;font-weight:700;margin-top:3px}
+  .card.caixa .value{color:var(--green)}
+  .card.receitas .value{color:var(--ok)}
+  .card.despesas .value{color:var(--clay)}
+  .cta{display:block;width:100%;background:var(--clay);color:#fff;border:none;border-radius:12px;
+       padding:16px;font-size:1.05rem;font-weight:700;cursor:pointer;margin:6px 0 18px}
+  .cta:active{background:var(--clay-dark)}
+  h2{font-size:1rem;margin:22px 0 8px;color:var(--green)}
+  .tbl-wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;font-size:.8rem;min-width:480px}
+  th,td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  th{background:var(--soft);color:var(--muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.5px}
+  tr:last-child td{border-bottom:none}
+  tr.yr{background:var(--soft);cursor:pointer;font-weight:700}
+  tr.yr td{padding:10px 8px}
+  tr.yr .seta{display:inline-block;transition:transform .2s;margin-right:6px;font-size:.7rem;color:var(--muted)}
+  tr.yr.open .seta{transform:rotate(90deg)}
+  tr.bim-row{display:none}
+  tr.bim-row.show{display:table-row}
+  .neg{color:var(--bad)} .pos{color:var(--ok)}
+  .muted{color:var(--muted);font-size:.8rem}
+  /* blocos colapsáveis (details) */
+  details.bloco{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-top:8px}
+  details.bloco summary{cursor:pointer;padding:13px 14px;font-weight:700;color:var(--clay);font-size:.88rem;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  details.bloco summary::-webkit-details-marker{display:none}
+  details.bloco summary::after{content:'▼';font-size:.7rem;color:var(--muted);transition:transform .2s;flex-shrink:0}
+  details.bloco[open] summary::after{transform:rotate(180deg)}
+  details.bloco .conteudo{border-top:1px solid var(--line)}
+  details.bloco table{min-width:520px;font-size:.78rem}
+  details.bloco td,details.bloco th{white-space:normal}
+  details.bloco td:first-child{white-space:nowrap}
+  details.bloco td:last-child{white-space:nowrap;font-weight:700;color:var(--bad)}
+  ul.nomes{list-style:none;padding:6px 14px 12px;font-size:.85rem;columns:2;column-gap:18px}
+  ul.nomes li{padding:3px 0;border-bottom:1px dashed var(--line);break-inside:avoid}
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10;overflow-y:auto;padding:16px 10px}
+  .overlay.open{display:flex;align-items:flex-start;justify-content:center}
+  .modal{background:var(--card);color:var(--txt);border-radius:16px;max-width:440px;width:100%;padding:20px;position:relative;margin:auto}
+  .modal h2{margin:0 0 12px}
+  .close-x{position:absolute;top:8px;right:10px;background:none;border:none;font-size:1.6rem;cursor:pointer;color:var(--muted);padding:6px}
+  label{display:block;font-size:.78rem;font-weight:600;margin:12px 0 4px}
+  input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:1rem;background:var(--bg);color:var(--txt)}
+  input[type=file]{padding:8px}
+  .bim-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+  .bim-opt{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:12px 10px;cursor:pointer;font-size:.85rem}
+  .bim-opt:has(input:checked){border-color:var(--green);background:var(--soft2);font-weight:600}
+  .bim-opt input{width:auto}
+  .total-box{background:var(--soft);border-radius:10px;padding:12px;text-align:center;margin:14px 0}
+  .total-box strong{font-size:1.35rem;color:var(--clay)}
+  .btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:10px}
+  .btn.primary{background:var(--green);color:#fff}
+  .btn.primary:active{background:var(--green-dark)}
+  .btn.secondary{background:var(--soft);color:var(--txt);border:1px solid var(--line)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  #qrcode{display:flex;justify-content:center;margin:14px 0}
+  #qrcode img,#qrcode canvas{border:8px solid #fff;border-radius:8px;box-shadow:var(--shadow);background:#fff}
+  .copia{font-size:.68rem;word-break:break-all;background:var(--soft);border:1px dashed var(--line);border-radius:8px;padding:8px;margin-top:8px}
+  .step{display:none}.step.active{display:block}
+  .alert{padding:10px;border-radius:8px;font-size:.85rem;margin-top:10px;display:none}
+  .alert.err{display:block;background:rgba(192,57,43,.12);color:var(--bad)}
+  .alert.ok{display:block;background:rgba(30,142,90,.12);color:var(--ok)}
+  #adminLink{color:#fff;opacity:.7;font-size:.75rem;text-decoration:underline;cursor:pointer}
+  /* página do gestor */
+  #adminPage{display:none}
+  .admin-top{display:flex;gap:8px;margin:10px 0 4px}
+  .admin-top button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--soft);color:var(--txt);font-weight:700;cursor:pointer;font-size:.85rem}
+  .pend{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--card);font-size:.9rem}
+  .pend .row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+  .pend .acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .pend .acts button{flex:1;min-width:90px;padding:10px 6px;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.85rem}
+  .b-apr{background:var(--ok);color:#fff}.b-rej{background:var(--bad);color:#fff}
+  .b-ver{background:var(--soft);color:var(--txt);border:1px solid var(--line)}
+  .badge{font-size:.68rem;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--clay);border:1px solid var(--line)}
+  .g-admin{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px dashed var(--line);font-size:.82rem}
+  .g-admin:last-child{border-bottom:none}
+  .g-admin button{background:none;border:none;color:var(--bad);font-size:1.05rem;cursor:pointer;padding:6px}
+  .g-admin .b-doc{color:var(--txt)}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+  .form-grid .full{grid-column:1/-1}
+  footer{text-align:center;padding:22px 12px;font-size:.75rem;color:var(--muted)}
+  @media (max-width:560px){
+    th.hide-sm,td.hide-sm{display:none}
+    table{min-width:380px;font-size:.76rem}
+    .cards{gap:6px}
+    .card{padding:10px 6px}
+    .card .value{font-size:.95rem}
+    .form-grid{grid-template-columns:1fr}
+    ul.nomes{columns:1}
+  }
+</style>
+</head>
+<body>
+<header>
+  <button id="themeBtn" title="Alternar fundo claro/escuro" onclick="toggleTheme()">🌙</button>
+  <h1>🎾 Quadras de Tênis do Cire</h1>
+  <p>Contribuições e transparência de gastos — Passos/MG</p>
+  <p style="margin-top:5px"><span id="adminLink">Área do gestor</span></p>
+</header>
+
+<!-- ===================== PÁGINA PÚBLICA ===================== -->
+<main id="publicPage">
+  <div class="cards">
+    <div class="card caixa"><div class="label">Caixa atual</div><div class="value" id="cCaixa">…</div></div>
+    <div class="card receitas"><div class="label">Arrecadado 2026</div><div class="value" id="cRec">…</div></div>
+    <div class="card despesas"><div class="label">Gasto 2026</div><div class="value" id="cDesp">…</div></div>
+  </div>
+
+  <button class="cta" onclick="openContrib()">💚 Quero contribuir — R$ 60 por bimestre</button>
+
+  <h2>Financeiro bimestre a bimestre</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Período</th><th>Receitas</th><th>Despesas</th><th class="hide-sm">Contrib.</th><th>Caixa</th></tr></thead>
+      <tbody id="finBody"><tr><td colspan="5">Carregando…</td></tr></tbody>
+    </table>
+  </div>
+  <p class="muted" style="margin-top:8px">Toque no ano para abrir ou recolher os bimestres. Receitas de 2026 incluem automaticamente as contribuições aprovadas pelo site; despesas de 2026 são a soma dos gastos detalhados abaixo.</p>
+
+  <h2>Gastos Detalhados</h2>
+  <div id="gastosBlocos"><p class="muted">Carregando…</p></div>
+
+  <h2>Contribuintes 2026 (aprovados pelo site)</h2>
+  <div id="contribBlocos"><p class="muted">Carregando…</p></div>
+</main>
+
+<!-- ===================== PÁGINA DO GESTOR ===================== -->
+<div id="adminPage">
+  <div class="admin-top">
+    <button onclick="fecharAdmin()">← Voltar ao site</button>
+    <button onclick="logoutAdmin()">Sair da conta</button>
+  </div>
+
+  <h2>Contribuições pendentes</h2>
+  <div id="pendList"><p class="muted">Carregando…</p></div>
+
+  <h2>Contribuintes aprovados por bimestre</h2>
+  <p class="muted">Toque no bimestre para abrir. O 🗑 ao lado do nome exclui a aprovação apenas daquele bimestre (o valor da contribuição é reduzido em R$ 60; se for o único bimestre, a contribuição inteira é removida).</p>
+  <div id="aprBlocos"><p class="muted">Carregando…</p></div>
+
+  <h2>Lançar gasto</h2>
+  <div class="form-grid">
+    <div><label>Data do evento</label><input type="date" id="gData"></div>
+    <div><label>Valor (R$)</label><input type="number" id="gValor" step="0.01" min="0.01" placeholder="0,00"></div>
+    <div class="full"><label>Fornecedor</label><input type="text" id="gForn" maxlength="80" placeholder="Quem recebeu / prestou o serviço"></div>
+    <div class="full"><label>Descrição (o que foi comprado/feito)</label><input type="text" id="gDesc" maxlength="160" placeholder="Ex.: compra de rede, serviço de pedreiro…"></div>
+  </div>
+  <div class="alert err" id="errGasto"></div>
+  <button class="btn primary" onclick="lancarGasto()">➕ Lançar gasto</button>
+
+  <h2>Gastos lançados</h2>
+  <div id="gAdminList" style="background:var(--card);border:1px solid var(--line);border-radius:12px"><p class="muted" style="padding:12px">Carregando…</p></div>
+
+  <div class="alert ok" id="okAdmin"></div>
+</div>
+
+<!-- MODAL CONTRIBUIÇÃO -->
+<div class="overlay" id="ovContrib">
+  <div class="modal">
+    <button class="close-x" onclick="closeOv('ovContrib')">×</button>
+
+    <div class="step active" id="step1">
+      <h2>Contribuir</h2>
+      <label>Seu nome completo</label>
+      <input type="text" id="fNome" maxlength="80" placeholder="Nome e sobrenome">
+      <label>Telefone (WhatsApp)</label>
+      <input type="tel" id="fTel" maxlength="20" placeholder="(35) 9xxxx-xxxx">
+      <label>Escolha o(s) bimestre(s)</label>
+      <div class="bim-grid" id="bimGrid"></div>
+      <p class="muted" style="margin-top:6px">Disponíveis apenas o bimestre atual e os próximos.</p>
+      <div class="total-box">Total: <strong id="fTotal">R$ 0,00</strong></div>
+      <div class="alert err" id="err1"></div>
+      <button class="btn primary" onclick="toStep2()">Gerar QR Code PIX</button>
+    </div>
+
+    <div class="step" id="step2">
+      <h2>Contribua via PIX</h2>
+      <p class="muted">Escaneie o QR Code no app do seu banco. Valor: <strong id="qrValor"></strong></p>
+      <div id="qrcode"></div>
+      <p class="muted">Ou use o PIX copia-e-cola:</p>
+      <div class="copia" id="pixCopia"></div>
+      <button class="btn secondary" onclick="copiarPix()">📋 Copiar código PIX</button>
+      <button class="btn primary" onclick="showStep(3)">Já contribuí → enviar comprovante</button>
+      <button class="btn secondary" onclick="showStep(1)">← Voltar</button>
+    </div>
+
+    <div class="step" id="step3">
+      <h2>Enviar comprovante</h2>
+      <p class="muted">Anexe o comprovante da sua contribuição (imagem ou PDF). O gestor irá conferir e aprovar.</p>
+      <label>Comprovante</label>
+      <input type="file" id="fComp" accept="image/*,.pdf">
+      <div class="alert err" id="err3"></div>
+      <button class="btn primary" id="btnEnviar" onclick="enviarContrib()">Enviar para aprovação</button>
+      <button class="btn secondary" onclick="showStep(2)">← Voltar</button>
+    </div>
+
+    <div class="step" id="step4">
+      <h2>✅ Recebido!</h2>
+      <p>Obrigado, <strong id="okNome"></strong>! Sua contribuição foi registrada e está <span class="badge">aguardando aprovação</span> do gestor. Assim que aprovada, seu nome entra na lista de contribuintes.</p>
+      <button class="btn primary" onclick="closeOv('ovContrib');location.reload()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LOGIN DO GESTOR -->
+<div class="overlay" id="ovLogin">
+  <div class="modal">
+    <button class="close-x" onclick="closeOv('ovLogin')">×</button>
+    <h2>Área do gestor</h2>
+    <label>E-mail</label>
+    <input type="email" id="aEmail" value="">
+    <label>Senha</label>
+    <input type="password" id="aSenha">
+    <div class="alert err" id="errLogin"></div>
+    <button class="btn primary" onclick="loginAdmin()">Entrar</button>
+  </div>
+</div>
+
+<footer>Manutenção das quadras de tênis — Clube Cire, Passos/MG · Contribuição voluntária, em caráter de doação</footer>
+
+<script>
+/* ================= CONFIG ================= */
+const SUPABASE_URL = 'https://lohtsdkpdwgytmuesufv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Nxwa1zcaQSdBCi9iCk5Msg_tk7wh6g8';
+const PIX_CHAVE  = 'alyssonmr@gmail.com';
+const PIX_NOME   = 'ALYSSON RODARTE';      // nome do recebedor (máx 25 caracteres)
+const PIX_CIDADE = 'PASSOS';
+const VALOR_BIMESTRE = 60;
+const BIM_NOMES = ['JAN/FEV','MAR/ABR','MAI/JUN','JUL/AGO','SET/OUT','NOV/DEZ'];
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const brl = v => Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const dataBR = d => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR');
+function esc(s){ return String(s).replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+function numBim(b){ return BIM_NOMES.indexOf(b.split(' ')[0]) + 1; } // 1..6
+function ordBim(b){ // ordenação cronológica de "JAN/FEV (2026)"
+  const ano = parseInt((b.match(/\((\d{4})\)/)||[])[1]||'0');
+  return ano*10 + numBim(b);
+}
+
+/* ================= TEMA ================= */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('themeBtn').textContent = t === 'dark' ? '☀️' : '🌙';
+  try{ localStorage.setItem('tema', t); }catch(e){}
+}
+function toggleTheme(){
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+(function(){
+  let t = 'light';
+  try{ t = localStorage.getItem('tema') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }catch(e){}
+  applyTheme(t);
+})();
+
+/* ================= BIMESTRE ATUAL ================= */
+function bimestreEhFuturoOuAtual(b){
+  const hoje = new Date();
+  const anoAtual = hoje.getFullYear();
+  const idxAtual = Math.ceil((hoje.getMonth()+1)/2);
+  const ano = parseInt((b.match(/\((\d{4})\)/)||[])[1]||'0');
+  return ano > anoAtual || (ano === anoAtual && numBim(b) >= idxAtual);
+}
+
+/* ================= DASHBOARD PÚBLICO ================= */
+let bimestresDisponiveis = [];
+const anosAbertos = new Set([String(new Date().getFullYear())]);
+
+async function loadDashboard(){
+  const [{data: fin, error: e1}, {data: site, error: e2}, {data: pag}, {data: gastos}] = await Promise.all([
+    db.from('financeiro').select('*').order('ordem'),
+    db.from('vw_receitas_site').select('*'),
+    db.from('vw_pagantes').select('*').order('nome'),
+    db.from('gastos').select('*').order('data')
+  ]);
+  if(e1||e2){ document.getElementById('finBody').innerHTML = '<tr><td colspan="5">Erro ao carregar dados.</td></tr>'; return; }
+
+  const siteMap = Object.fromEntries((site||[]).map(r=>[r.bimestre, Number(r.receita_site)]));
+  const gastoMap = {};
+  (gastos||[]).forEach(g => gastoMap[g.bimestre] = (gastoMap[g.bimestre]||0) + Number(g.valor));
+
+  bimestresDisponiveis = fin.filter(r=>r.aberto && bimestreEhFuturoOuAtual(r.bimestre)).map(r=>r.bimestre);
+  renderBimGrid();
+
+  /* --- tabela financeiro agrupada por ano --- */
+  let caixa = 0, rec26 = 0, desp26 = 0;
+  const grupos = [];
+  for(const r of fin){
+    const receitas = Number(r.receitas) + (siteMap[r.bimestre]||0);
+    const despesas = Number(r.despesas) + (gastoMap[r.bimestre]||0);
+    caixa += receitas - despesas;
+    if(r.bimestre.includes('2026') && r.tipo==='Contribuições'){ rec26 += receitas; desp26 += despesas; }
+    let contrib = '—';
+    if(r.tipo==='Contribuições'){
+      const ano = parseInt(r.bimestre.match(/\d{4}/)?.[0]||'0');
+      contrib = (receitas/(ano<=2023?50:60)).toLocaleString('pt-BR',{maximumFractionDigits:1});
+    }
+    const key = r.tipo==='Residual' ? '2020/2021' : (r.bimestre.match(/\d{4}/g)||[]).pop();
+    let g = grupos[grupos.length-1];
+    if(!g || g.key !== key){ g = {key, rows:[]}; grupos.push(g); }
+    g.rows.push({...r, receitasT: receitas, despesasT: despesas, contrib, caixaT: caixa});
+  }
+  let html = '';
+  for(const g of grupos){
+    const recA = g.rows.reduce((s,r)=>s+r.receitasT,0);
+    const despA = g.rows.reduce((s,r)=>s+r.despesasT,0);
+    const caixaFim = g.rows[g.rows.length-1].caixaT;
+    const aberto = anosAbertos.has(g.key);
+    html += `<tr class="yr ${aberto?'open':''}" data-yr="${g.key}" onclick="toggleYear('${g.key}')">
+      <td><span class="seta">▶</span>${g.key}</td>
+      <td class="pos">${brl(recA)}</td>
+      <td class="${despA>0?'neg':''}">${brl(despA)}</td>
+      <td class="hide-sm"></td>
+      <td><strong>${brl(caixaFim)}</strong></td></tr>`;
+    for(const r of g.rows){
+      html += `<tr class="bim-row ${aberto?'show':''}" data-yr="${g.key}">
+        <td style="padding-left:24px">${r.bimestre}${r.tipo!=='Contribuições'&&r.tipo!=='Residual'?` <span class="badge">${r.tipo}</span>`:''}</td>
+        <td class="pos">${brl(r.receitasT)}</td>
+        <td class="${r.despesasT>0?'neg':''}">${brl(r.despesasT)}</td>
+        <td class="hide-sm">${r.contrib}</td>
+        <td>${brl(r.caixaT)}</td></tr>`;
+    }
+  }
+  document.getElementById('finBody').innerHTML = html;
+  document.getElementById('cCaixa').textContent = brl(caixa);
+  document.getElementById('cRec').textContent = brl(rec26);
+  document.getElementById('cDesp').textContent = brl(desp26);
+
+  /* --- Gastos Detalhados: um bloco colapsável por bimestre, com tabela --- */
+  const porBimG = {};
+  (gastos||[]).forEach(g => (porBimG[g.bimestre]=porBimG[g.bimestre]||[]).push(g));
+  const gb = document.getElementById('gastosBlocos');
+  const bimsG = Object.keys(porBimG).sort((a,b)=>ordBim(a)-ordBim(b));
+  gb.innerHTML = bimsG.length
+    ? bimsG.map(b=>{
+        const lst = porBimG[b];
+        const tot = lst.reduce((s,g)=>s+Number(g.valor),0);
+        return `<details class="bloco">
+          <summary><span>Detalhamento de Gastos do Bimestre ${numBim(b)} — ${b}</span><span class="muted">${lst.length} · ${brl(tot)}</span></summary>
+          <div class="conteudo tbl-wrap" style="border-radius:0 0 12px 12px;border:none">
+            <table>
+              <thead><tr><th>Data</th><th style="text-align:left">Descrição do serviço</th><th style="text-align:left">Fornecedor</th><th>Valor</th></tr></thead>
+              <tbody>${lst.map(g=>`<tr>
+                <td>${dataBR(g.data)}</td>
+                <td style="text-align:left">${g.descricao?esc(g.descricao):'<span class="muted">—</span>'}</td>
+                <td style="text-align:left">${esc(g.fornecedor)}</td>
+                <td>− ${brl(g.valor)}</td></tr>`).join('')}
+              <tr><td colspan="3" style="text-align:right;font-weight:700">Total do bimestre</td><td>− ${brl(tot)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>`;
+      }).join('')
+    : '<p class="muted">Nenhum gasto lançado ainda.</p>';
+
+  /* --- Contribuintes: um bloco colapsável por bimestre --- */
+  const porBimC = {};
+  (pag||[]).forEach(p => p.bimestres.forEach(b => { (porBimC[b]=porBimC[b]||[]).push(p.nome); }));
+  const cb = document.getElementById('contribBlocos');
+  const bimsC = Object.keys(porBimC).sort((a,b)=>ordBim(a)-ordBim(b));
+  cb.innerHTML = bimsC.length
+    ? bimsC.map(b=>`<details class="bloco">
+        <summary><span>${b}</span><span class="muted">${porBimC[b].length} contribuinte(s)</span></summary>
+        <div class="conteudo"><ul class="nomes">${porBimC[b].sort().map(n=>`<li>✅ ${esc(n)}</li>`).join('')}</ul></div>
+      </details>`).join('')
+    : '<p class="muted">Ainda não há contribuições aprovadas pelo site. Seja o primeiro!</p>';
+}
+
+function toggleYear(key){
+  const hdr = document.querySelector(`tr.yr[data-yr="${key}"]`);
+  const abrir = !hdr.classList.contains('open');
+  hdr.classList.toggle('open', abrir);
+  document.querySelectorAll(`tr.bim-row[data-yr="${key}"]`).forEach(tr=>tr.classList.toggle('show', abrir));
+  abrir ? anosAbertos.add(key) : anosAbertos.delete(key);
+}
+
+/* ================= CONTRIBUIÇÃO ================= */
+function renderBimGrid(){
+  document.getElementById('bimGrid').innerHTML = bimestresDisponiveis.length
+    ? bimestresDisponiveis.map(b =>
+      `<label class="bim-opt"><input type="checkbox" value="${b}" onchange="calcTotal()"> ${b.replace(' (2026)','')}</label>`).join('')
+    : '<p class="muted">Nenhum bimestre disponível no momento.</p>';
+}
+function selBims(){ return [...document.querySelectorAll('#bimGrid input:checked')].map(i=>i.value); }
+function calcTotal(){ document.getElementById('fTotal').textContent = brl(selBims().length*VALOR_BIMESTRE); }
+function openContrib(){ showStep(1); document.getElementById('ovContrib').classList.add('open'); }
+function closeOv(id){ document.getElementById(id).classList.remove('open'); }
+function showStep(n){ document.querySelectorAll('#ovContrib .step').forEach(s=>s.classList.remove('active'));
+  document.getElementById('step'+n).classList.add('active'); }
+
+let pixPayloadStr = '';
+function toStep2(){
+  const nome = document.getElementById('fNome').value.trim();
+  const tel  = document.getElementById('fTel').value.trim();
+  const bims = selBims();
+  const err = document.getElementById('err1'); err.className='alert err'; err.style.display='none';
+  if(nome.length<3){ err.textContent='Informe seu nome completo.'; err.style.display='block'; return; }
+  if(tel.replace(/\D/g,'').length<8){ err.textContent='Informe um telefone válido.'; err.style.display='block'; return; }
+  if(!bims.length){ err.textContent='Escolha pelo menos um bimestre.'; err.style.display='block'; return; }
+  const valor = bims.length*VALOR_BIMESTRE;
+  pixPayloadStr = gerarPix(valor);
+  document.getElementById('qrValor').textContent = brl(valor);
+  document.getElementById('pixCopia').textContent = pixPayloadStr;
+  const qr = document.getElementById('qrcode'); qr.innerHTML='';
+  new QRCode(qr, {text: pixPayloadStr, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M});
+  showStep(2);
+}
+function copiarPix(){ navigator.clipboard.writeText(pixPayloadStr).then(()=>alert('Código PIX copiado!')); }
+
+async function enviarContrib(){
+  const err = document.getElementById('err3'); err.style.display='none';
+  const file = document.getElementById('fComp').files[0];
+  if(!file){ err.textContent='Anexe o comprovante da contribuição.'; err.style.display='block'; return; }
+  if(file.size > 10*1024*1024){ err.textContent='Arquivo muito grande (máx. 10 MB).'; err.style.display='block'; return; }
+  const btn = document.getElementById('btnEnviar'); btn.disabled=true; btn.textContent='Enviando…';
+  try{
+    const nome = document.getElementById('fNome').value.trim();
+    const tel  = document.getElementById('fTel').value.trim();
+    const bims = selBims();
+    const ext  = (file.name.split('.').pop()||'jpg').toLowerCase();
+    const path = `${crypto.randomUUID()}.${ext}`;
+    const {error: eUp} = await db.storage.from('comprovantes').upload(path, file);
+    if(eUp) throw eUp;
+    const {error: eIns} = await db.from('contribuicoes').insert({
+      nome, telefone: tel, bimestres: bims, valor: bims.length*VALOR_BIMESTRE, comprovante_path: path
+    });
+    if(eIns) throw eIns;
+    document.getElementById('okNome').textContent = nome;
+    showStep(4);
+  }catch(e){
+    err.textContent = 'Erro ao enviar: ' + (e.message||e); err.style.display='block';
+  }finally{ btn.disabled=false; btn.textContent='Enviar para aprovação'; }
+}
+
+/* ================= PIX (BR Code EMV) ================= */
+function emv(id, valor){ return id + String(valor.length).padStart(2,'0') + valor; }
+function crc16(str){
+  let crc = 0xFFFF;
+  for(let i=0;i<str.length;i++){
+    crc ^= str.charCodeAt(i) << 8;
+    for(let j=0;j<8;j++) crc = (crc & 0x8000) ? ((crc<<1)^0x1021)&0xFFFF : (crc<<1)&0xFFFF;
+  }
+  return crc.toString(16).toUpperCase().padStart(4,'0');
+}
+function gerarPix(valor){
+  const gui = emv('00','br.gov.bcb.pix') + emv('01', PIX_CHAVE);
+  let p = emv('00','01') + emv('26', gui) + emv('52','0000') + emv('53','986')
+        + emv('54', valor.toFixed(2)) + emv('58','BR')
+        + emv('59', PIX_NOME.substring(0,25)) + emv('60', PIX_CIDADE.substring(0,15))
+        + emv('62', emv('05','***')) + '6304';
+  return p + crc16(p);
+}
+
+/* ================= GESTOR ================= */
+document.getElementById('adminLink').onclick = async () => {
+  const {data:{session}} = await db.auth.getSession();
+  if(session){ abrirAdmin(); } else { document.getElementById('ovLogin').classList.add('open'); }
+};
+async function loginAdmin(){
+  const err = document.getElementById('errLogin'); err.style.display='none';
+  const {error} = await db.auth.signInWithPassword({
+    email: document.getElementById('aEmail').value.trim(),
+    password: document.getElementById('aSenha').value
+  });
+  if(error){ err.textContent='Login inválido: '+error.message; err.style.display='block'; return; }
+  closeOv('ovLogin');
+  abrirAdmin();
+}
+function abrirAdmin(){
+  document.getElementById('publicPage').style.display='none';
+  document.getElementById('adminPage').style.display='block';
+  document.getElementById('gData').value = new Date().toISOString().slice(0,10);
+  window.scrollTo(0,0);
+  loadPendentes(); loadAprovadas(); loadGastosAdmin();
+}
+function fecharAdmin(){
+  document.getElementById('adminPage').style.display='none';
+  document.getElementById('publicPage').style.display='block';
+  loadDashboard();
+}
+async function logoutAdmin(){ await db.auth.signOut(); location.reload(); }
+
+async function loadPendentes(){
+  const {data, error} = await db.from('contribuicoes').select('*').eq('status','pendente').order('created_at');
+  const el = document.getElementById('pendList');
+  if(error){ el.innerHTML = `<p class="muted">Erro: ${error.message}</p>`; return; }
+  if(!data.length){ el.innerHTML = '<p class="muted">Nenhuma pendência. 🎉</p>'; return; }
+  el.innerHTML = data.map(c=>`
+    <div class="pend" id="pend-${c.id}">
+      <div class="row"><strong>${esc(c.nome)}</strong><span>${brl(c.valor)}</span></div>
+      <div class="row muted"><span>📱 ${esc(c.telefone)}</span><span>${new Date(c.created_at).toLocaleDateString('pt-BR')}</span></div>
+      <div class="muted">Bimestres: ${c.bimestres.join(', ')}</div>
+      <div class="acts">
+        <button class="b-ver" onclick="verComprovante('${c.comprovante_path||''}')">📄 Comprovante</button>
+        <button class="b-apr" onclick="decidir('${c.id}','aprovada')">✔ Aprovar</button>
+        <button class="b-rej" onclick="decidir('${c.id}','rejeitada')">✘ Rejeitar</button>
+      </div>
+    </div>`).join('');
+}
+
+/* aprovados agrupados por bimestre; exclusão por bimestre específico */
+async function loadAprovadas(){
+  const {data, error} = await db.from('contribuicoes').select('*').eq('status','aprovada').order('nome');
+  const el = document.getElementById('aprBlocos');
+  if(error){ el.innerHTML = `<p class="muted">Erro: ${error.message}</p>`; return; }
+  if(!data.length){ el.innerHTML = '<p class="muted">Nenhuma contribuição aprovada ainda.</p>'; return; }
+  const porBim = {};
+  data.forEach(c => c.bimestres.forEach(b => { (porBim[b]=porBim[b]||[]).push(c); }));
+  const bims = Object.keys(porBim).sort((a,b)=>ordBim(a)-ordBim(b));
+  el.innerHTML = bims.map(b=>`<details class="bloco">
+      <summary><span>${b}</span><span class="muted">${porBim[b].length} contribuinte(s)</span></summary>
+      <div class="conteudo">${porBim[b].sort((x,y)=>x.nome.localeCompare(y.nome)).map(c=>`
+        <div class="g-admin">
+          <span><strong>${esc(c.nome)}</strong><br><span class="muted">📱 ${esc(c.telefone)}</span></span>
+          <span style="white-space:nowrap">
+            <button class="b-doc" title="Ver comprovante" onclick="verComprovante('${c.comprovante_path||''}')">📄</button>
+            <button title="Excluir deste bimestre" onclick="removerDoBimestre('${c.id}','${b}')">🗑</button>
+          </span>
+        </div>`).join('')}
+      </div>
+    </details>`).join('');
+}
+async function removerDoBimestre(id, bim){
+  const {data: c, error: e1} = await db.from('contribuicoes').select('*').eq('id', id).single();
+  if(e1){ alert('Erro: '+e1.message); return; }
+  const restantes = c.bimestres.filter(b=>b!==bim);
+  const msg = restantes.length
+    ? `Excluir "${c.nome}" apenas de ${bim}? A contribuição passa de ${brl(c.valor)} para ${brl(restantes.length*VALOR_BIMESTRE)}.`
+    : `${bim} é o único bimestre de "${c.nome}". Excluir a contribuição inteira?`;
+  if(!confirm(msg)) return;
+  const {error} = restantes.length
+    ? await db.from('contribuicoes').update({bimestres: restantes, valor: restantes.length*VALOR_BIMESTRE}).eq('id', id)
+    : await db.from('contribuicoes').delete().eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  flashAdmin(restantes.length ? `"${c.nome}" excluído de ${bim}.` : `Contribuição de "${c.nome}" excluída.`);
+  loadAprovadas();
+}
+async function verComprovante(path){
+  if(!path){ alert('Sem comprovante anexado.'); return; }
+  const {data, error} = await db.storage.from('comprovantes').download(path);
+  if(error){ alert('Erro ao abrir: '+error.message); return; }
+  window.open(URL.createObjectURL(data), '_blank');
+}
+async function decidir(id, status){
+  if(!confirm(`Confirmar: ${status}?`)) return;
+  const {error} = await db.from('contribuicoes').update({status, reviewed_at: new Date().toISOString()}).eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  document.getElementById('pend-'+id).remove();
+  flashAdmin(`Contribuição ${status}.`);
+  loadAprovadas();
+}
+
+/* ---- gastos (gestor) ---- */
+function bimestreDaData(iso){
+  const [ano, mes] = iso.split('-').map(Number);
+  return `${BIM_NOMES[Math.ceil(mes/2)-1]} (${ano})`;
+}
+async function lancarGasto(){
+  const err = document.getElementById('errGasto'); err.style.display='none';
+  const data = document.getElementById('gData').value;
+  const forn = document.getElementById('gForn').value.trim();
+  const desc = document.getElementById('gDesc').value.trim();
+  const valor = parseFloat(document.getElementById('gValor').value);
+  if(!data){ err.textContent='Informe a data do evento.'; err.style.display='block'; return; }
+  if(forn.length<2){ err.textContent='Informe o fornecedor.'; err.style.display='block'; return; }
+  if(!(valor>0)){ err.textContent='Informe um valor maior que zero.'; err.style.display='block'; return; }
+  const bim = bimestreDaData(data);
+  const {error} = await db.from('gastos').insert({data, fornecedor: forn, descricao: desc||null, valor, bimestre: bim});
+  if(error){ err.textContent='Erro: '+error.message; err.style.display='block'; return; }
+  document.getElementById('gForn').value=''; document.getElementById('gDesc').value=''; document.getElementById('gValor').value='';
+  flashAdmin('Gasto lançado.');
+  loadGastosAdmin();
+}
+async function loadGastosAdmin(){
+  const {data} = await db.from('gastos').select('*').order('data', {ascending:false});
+  const el = document.getElementById('gAdminList');
+  el.innerHTML = (data&&data.length)
+    ? data.map(g=>`<div class="g-admin">
+        <span>${dataBR(g.data)} · <strong>${esc(g.fornecedor)}</strong>${g.descricao?` — ${esc(g.descricao)}`:''}</span>
+        <span style="white-space:nowrap">${brl(g.valor)} <button title="Excluir" onclick="excluirGasto('${g.id}')">🗑</button></span>
+      </div>`).join('')
+    : '<p class="muted" style="padding:12px">Nenhum gasto lançado.</p>';
+}
+async function excluirGasto(id){
+  if(!confirm('Excluir este gasto?')) return;
+  const {error} = await db.from('gastos').delete().eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  flashAdmin('Gasto excluído.');
+  loadGastosAdmin();
+}
+function flashAdmin(msg){
+  const ok = document.getElementById('okAdmin');
+  ok.textContent = msg; ok.className='alert ok'; ok.style.display='block';
+  setTimeout(()=>ok.style.display='none', 3000);
+}
+
+loadDashboard();
+</script>
+</body>
+</html>
