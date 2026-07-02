@@ -318,7 +318,7 @@ function bimestreDisponivel(b){
 let bimestresDisponiveis = [];
 let bimestresAbertosTodos = [];
 let listasPorBim = {};
-const anosAbertos = new Set([String(new Date().getFullYear())]);
+const anosAbertos = new Set(); // todos os anos começam recolhidos
 
 async function loadDashboard(){
   const [{data: fin, error: e1}, {data: site, error: e2}, {data: pag}, {data: gastos}] = await Promise.all([
@@ -348,7 +348,7 @@ async function loadDashboard(){
     let contrib = '—';
     if(r.tipo==='Contribuições'){
       const ano = parseInt(r.bimestre.match(/\d{4}/)?.[0]||'0');
-      contrib = (receitas/(ano<=2023?50:60)).toLocaleString('pt-BR',{maximumFractionDigits:1});
+      contrib = String(Math.ceil(receitas/(ano<=2023?50:60)));
     }
     const key = r.tipo==='Residual' ? '2020/2021' : (r.bimestre.match(/\d{4}/g)||[]).pop();
     let g = grupos[grupos.length-1];
@@ -372,7 +372,7 @@ async function loadDashboard(){
       <td><span class="seta">▶</span>${g.key}</td>
       <td class="pos">${brl(recA)}</td>
       <td class="${despA>0?'neg':''}">${brl(despA)}</td>
-      <td class="hide-sm">${mediaA!==null?'média '+mediaA.toLocaleString('pt-BR',{maximumFractionDigits:1}):'—'}</td>
+      <td class="hide-sm">${mediaA!==null?'média '+Math.ceil(mediaA):'—'}</td>
       <td><strong>${brl(caixaFim)}</strong></td></tr>`;
     for(const r of g.rows){
       html += `<tr class="bim-row ${aberto?'show':''}" data-yr="${g.key}">
@@ -406,7 +406,7 @@ async function loadDashboard(){
                 <td>${dataBR(g.data)}</td>
                 <td style="text-align:left">${g.descricao?esc(g.descricao):'<span class="muted">—</span>'}</td>
                 <td style="text-align:left">${esc(g.fornecedor)}</td>
-                <td>− ${brl(g.valor)}</td></tr>`).join('')}
+                <td>${g.valor<0?'+ '+brl(-g.valor):'− '+brl(g.valor)}</td></tr>`).join('')}
               <tr><td colspan="3" style="text-align:right;font-weight:700">Total do bimestre</td><td>− ${brl(tot)}</td></tr>
               </tbody>
             </table>
