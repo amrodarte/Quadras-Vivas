@@ -1,6 +1,6 @@
 # Quadras de Tênis do Cire — Contribuições
 
-Site do Projeto Quadras Vivas, de contribuições valuntárias e transparência de gastos para a manutenção das quadras de tênis do clube Cire, em Passos/MG.
+Site do Projeto Quadras Vivas, de contribuições voluntárias e transparência de gastos para a manutenção das quadras de tênis do clube Cire, em Passos/MG.
 
 **Site:** https://amrodarte.github.io/Quadras-Vivas/
 
@@ -18,4 +18,4 @@ Página estática única (`index.html`) hospedada no GitHub Pages. Os dados fica
 
 ## Desenvolvimento
 
-Não há build: edite `index.html` e recarregue a página.
+Não há build: edit
