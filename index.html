@@ -175,6 +175,18 @@
   <p class="muted">Toque no bimestre para abrir. O 🗑 ao lado do nome exclui a aprovação apenas daquele bimestre (o valor da contribuição é reduzido em R$ 60; se for o único bimestre, a contribuição inteira é removida).</p>
   <div id="aprBlocos"><p class="muted">Carregando…</p></div>
 
+  <h2>Lançar contribuição (ex.: em dinheiro)</h2>
+  <p class="muted">Para contribuintes sem comprovante. Entra direto como aprovada, em qualquer bimestre aberto.</p>
+  <div class="form-grid">
+    <div class="full"><label>Nome do contribuinte</label><input type="text" id="mNome" maxlength="80" placeholder="Nome e sobrenome"></div>
+    <div class="full"><label>Telefone (opcional)</label><input type="tel" id="mTel" maxlength="20" placeholder="(35) 9xxxx-xxxx"></div>
+  </div>
+  <label>Bimestre(s)</label>
+  <div class="bim-grid" id="adminBimGrid"></div>
+  <div class="total-box">Total: <strong id="mTotal">R$ 0,00</strong></div>
+  <div class="alert err" id="errManual"></div>
+  <button class="btn primary" onclick="lancarContribuicao()">➕ Lançar contribuição aprovada</button>
+
   <h2>Lançar gasto</h2>
   <div class="form-grid">
     <div><label>Data do evento</label><input type="date" id="gData"></div>
@@ -186,7 +198,7 @@
   <button class="btn primary" onclick="lancarGasto()">➕ Lançar gasto</button>
 
   <h2>Gastos lançados</h2>
-  <div id="gAdminList" style="background:var(--card);border:1px solid var(--line);border-radius:12px"><p class="muted" style="padding:12px">Carregando…</p></div>
+  <div id="gAdminList"><p class="muted">Carregando…</p></div>
 
   <div class="alert ok" id="okAdmin"></div>
 </div>
@@ -204,7 +216,7 @@
       <input type="tel" id="fTel" maxlength="20" placeholder="(35) 9xxxx-xxxx">
       <label>Escolha o(s) bimestre(s)</label>
       <div class="bim-grid" id="bimGrid"></div>
-      <p class="muted" style="margin-top:6px">Disponíveis apenas o bimestre atual e os próximos.</p>
+      <p class="muted" style="margin-top:6px">Disponíveis: o bimestre anterior, o atual e os próximos 6.</p>
       <div class="total-box">Total: <strong id="fTotal">R$ 0,00</strong></div>
       <div class="alert err" id="err1"></div>
       <button class="btn primary" onclick="toStep2()">Gerar QR Code PIX</button>
@@ -290,24 +302,30 @@ function toggleTheme(){
   applyTheme(t);
 })();
 
-/* ================= BIMESTRE ATUAL ================= */
-function bimestreEhFuturoOuAtual(b){
-  const hoje = new Date();
-  const anoAtual = hoje.getFullYear();
-  const idxAtual = Math.ceil((hoje.getMonth()+1)/2);
+/* ================= JANELA DE BIMESTRES =================
+   Disponível para contribuir: 1 bimestre anterior ao atual até 6 à frente */
+function ordDe(b){
   const ano = parseInt((b.match(/\((\d{4})\)/)||[])[1]||'0');
-  return ano > anoAtual || (ano === anoAtual && numBim(b) >= idxAtual);
+  return ano*6 + numBim(b);
+}
+function bimestreDisponivel(b){
+  const hoje = new Date();
+  const atual = hoje.getFullYear()*6 + Math.ceil((hoje.getMonth()+1)/2);
+  const o = ordDe(b);
+  return o >= atual-1 && o <= atual+6;
 }
 
 /* ================= DASHBOARD PÚBLICO ================= */
 let bimestresDisponiveis = [];
+let bimestresAbertosTodos = [];
+let listasPorBim = {};
 const anosAbertos = new Set([String(new Date().getFullYear())]);
 
 async function loadDashboard(){
   const [{data: fin, error: e1}, {data: site, error: e2}, {data: pag}, {data: gastos}] = await Promise.all([
     db.from('financeiro').select('*').order('ordem'),
     db.from('vw_receitas_site').select('*'),
-    db.from('vw_pagantes').select('*').order('nome'),
+    db.from('vw_pagantes').select('*').order('reviewed_at'),
     db.from('gastos').select('*').order('data')
   ]);
   if(e1||e2){ document.getElementById('finBody').innerHTML = '<tr><td colspan="5">Erro ao carregar dados.</td></tr>'; return; }
@@ -316,7 +334,8 @@ async function loadDashboard(){
   const gastoMap = {};
   (gastos||[]).forEach(g => gastoMap[g.bimestre] = (gastoMap[g.bimestre]||0) + Number(g.valor));
 
-  bimestresDisponiveis = fin.filter(r=>r.aberto && bimestreEhFuturoOuAtual(r.bimestre)).map(r=>r.bimestre);
+  bimestresAbertosTodos = fin.filter(r=>r.aberto).map(r=>r.bimestre);
+  bimestresDisponiveis = fin.filter(r=>r.aberto && bimestreDisponivel(r.bimestre)).map(r=>r.bimestre);
   renderBimGrid();
 
   /* --- tabela financeiro agrupada por ano --- */
@@ -390,17 +409,29 @@ async function loadDashboard(){
       }).join('')
     : '<p class="muted">Nenhum gasto lançado ainda.</p>';
 
-  /* --- Contribuintes: um bloco colapsável por bimestre --- */
+  /* --- Contribuintes: bloco colapsável por bimestre, numerados por ordem de aprovação --- */
   const porBimC = {};
   (pag||[]).forEach(p => p.bimestres.forEach(b => { (porBimC[b]=porBimC[b]||[]).push(p.nome); }));
+  listasPorBim = porBimC;
   const cb = document.getElementById('contribBlocos');
   const bimsC = Object.keys(porBimC).sort((a,b)=>ordBim(a)-ordBim(b));
   cb.innerHTML = bimsC.length
     ? bimsC.map(b=>`<details class="bloco">
         <summary><span>${b}</span><span class="muted">${porBimC[b].length} contribuinte(s)</span></summary>
-        <div class="conteudo"><ul class="nomes">${porBimC[b].sort().map(n=>`<li>✅ ${esc(n)}</li>`).join('')}</ul></div>
+        <div class="conteudo">
+          <ul class="nomes">${porBimC[b].map((n,i)=>`<li>${i+1}. ${esc(n)}</li>`).join('')}</ul>
+          <div style="padding:0 14px 12px"><button class="btn secondary" style="margin-top:0" onclick="copiarLista('${b}')">📋 Copiar lista para o WhatsApp</button></div>
+        </div>
       </details>`).join('')
     : '<p class="muted">Ainda não há contribuições aprovadas pelo site. Seja o primeiro!</p>';
+}
+
+function copiarLista(b){
+  const nomes = listasPorBim[b]||[];
+  const texto = `🎾 *Contribuintes ${b} — Quadras do Cire*\n`
+    + nomes.map((n,i)=>`${i+1}. ${n}`).join('\n')
+    + `\n\nTotal: ${nomes.length} contribuinte(s)`;
+  navigator.clipboard.writeText(texto).then(()=>alert('Lista copiada! É só colar no WhatsApp.'));
 }
 
 function toggleYear(key){
@@ -415,7 +446,7 @@ function toggleYear(key){
 function renderBimGrid(){
   document.getElementById('bimGrid').innerHTML = bimestresDisponiveis.length
     ? bimestresDisponiveis.map(b =>
-      `<label class="bim-opt"><input type="checkbox" value="${b}" onchange="calcTotal()"> ${b.replace(' (2026)','')}</label>`).join('')
+      `<label class="bim-opt"><input type="checkbox" value="${b}" onchange="calcTotal()"> ${b.replace(/[()]/g,'')}</label>`).join('')
     : '<p class="muted">Nenhum bimestre disponível no momento.</p>';
 }
 function selBims(){ return [...document.querySelectorAll('#bimGrid input:checked')].map(i=>i.value); }
@@ -507,8 +538,34 @@ function abrirAdmin(){
   document.getElementById('publicPage').style.display='none';
   document.getElementById('adminPage').style.display='block';
   document.getElementById('gData').value = new Date().toISOString().slice(0,10);
+  renderAdminBimGrid();
   window.scrollTo(0,0);
   loadPendentes(); loadAprovadas(); loadGastosAdmin();
+}
+function renderAdminBimGrid(){
+  document.getElementById('adminBimGrid').innerHTML = bimestresAbertosTodos.map(b =>
+    `<label class="bim-opt"><input type="checkbox" value="${b}" onchange="calcTotalManual()"> ${b.replace(/[()]/g,'')}</label>`).join('');
+}
+function selBimsManual(){ return [...document.querySelectorAll('#adminBimGrid input:checked')].map(i=>i.value); }
+function calcTotalManual(){ document.getElementById('mTotal').textContent = brl(selBimsManual().length*VALOR_BIMESTRE); }
+async function lancarContribuicao(){
+  const err = document.getElementById('errManual'); err.style.display='none';
+  const nome = document.getElementById('mNome').value.trim();
+  const tel  = document.getElementById('mTel').value.trim();
+  const bims = selBimsManual();
+  if(nome.length<3){ err.textContent='Informe o nome do contribuinte.'; err.style.display='block'; return; }
+  if(!bims.length){ err.textContent='Escolha pelo menos um bimestre.'; err.style.display='block'; return; }
+  if(!confirm(`Lançar contribuição de "${nome}" (${brl(bims.length*VALOR_BIMESTRE)}) já aprovada?`)) return;
+  const {error} = await db.from('contribuicoes').insert({
+    nome, telefone: tel || '(em dinheiro)', bimestres: bims, valor: bims.length*VALOR_BIMESTRE,
+    status: 'aprovada', reviewed_at: new Date().toISOString()
+  });
+  if(error){ err.textContent='Erro: '+error.message; err.style.display='block'; return; }
+  document.getElementById('mNome').value=''; document.getElementById('mTel').value='';
+  document.querySelectorAll('#adminBimGrid input:checked').forEach(i=>i.checked=false);
+  calcTotalManual();
+  flashAdmin(`Contribuição de "${nome}" lançada e aprovada.`);
+  loadAprovadas();
 }
 function fecharAdmin(){
   document.getElementById('adminPage').style.display='none';
@@ -568,70 +625,4 @@ async function removerDoBimestre(id, bim){
   const {error} = restantes.length
     ? await db.from('contribuicoes').update({bimestres: restantes, valor: restantes.length*VALOR_BIMESTRE}).eq('id', id)
     : await db.from('contribuicoes').delete().eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  flashAdmin(restantes.length ? `"${c.nome}" excluído de ${bim}.` : `Contribuição de "${c.nome}" excluída.`);
-  loadAprovadas();
-}
-async function verComprovante(path){
-  if(!path){ alert('Sem comprovante anexado.'); return; }
-  const {data, error} = await db.storage.from('comprovantes').download(path);
-  if(error){ alert('Erro ao abrir: '+error.message); return; }
-  window.open(URL.createObjectURL(data), '_blank');
-}
-async function decidir(id, status){
-  if(!confirm(`Confirmar: ${status}?`)) return;
-  const {error} = await db.from('contribuicoes').update({status, reviewed_at: new Date().toISOString()}).eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  document.getElementById('pend-'+id).remove();
-  flashAdmin(`Contribuição ${status}.`);
-  loadAprovadas();
-}
-
-/* ---- gastos (gestor) ---- */
-function bimestreDaData(iso){
-  const [ano, mes] = iso.split('-').map(Number);
-  return `${BIM_NOMES[Math.ceil(mes/2)-1]} (${ano})`;
-}
-async function lancarGasto(){
-  const err = document.getElementById('errGasto'); err.style.display='none';
-  const data = document.getElementById('gData').value;
-  const forn = document.getElementById('gForn').value.trim();
-  const desc = document.getElementById('gDesc').value.trim();
-  const valor = parseFloat(document.getElementById('gValor').value);
-  if(!data){ err.textContent='Informe a data do evento.'; err.style.display='block'; return; }
-  if(forn.length<2){ err.textContent='Informe o fornecedor.'; err.style.display='block'; return; }
-  if(!(valor>0)){ err.textContent='Informe um valor maior que zero.'; err.style.display='block'; return; }
-  const bim = bimestreDaData(data);
-  const {error} = await db.from('gastos').insert({data, fornecedor: forn, descricao: desc||null, valor, bimestre: bim});
-  if(error){ err.textContent='Erro: '+error.message; err.style.display='block'; return; }
-  document.getElementById('gForn').value=''; document.getElementById('gDesc').value=''; document.getElementById('gValor').value='';
-  flashAdmin('Gasto lançado.');
-  loadGastosAdmin();
-}
-async function loadGastosAdmin(){
-  const {data} = await db.from('gastos').select('*').order('data', {ascending:false});
-  const el = document.getElementById('gAdminList');
-  el.innerHTML = (data&&data.length)
-    ? data.map(g=>`<div class="g-admin">
-        <span>${dataBR(g.data)} · <strong>${esc(g.fornecedor)}</strong>${g.descricao?` — ${esc(g.descricao)}`:''}</span>
-        <span style="white-space:nowrap">${brl(g.valor)} <button title="Excluir" onclick="excluirGasto('${g.id}')">🗑</button></span>
-      </div>`).join('')
-    : '<p class="muted" style="padding:12px">Nenhum gasto lançado.</p>';
-}
-async function excluirGasto(id){
-  if(!confirm('Excluir este gasto?')) return;
-  const {error} = await db.from('gastos').delete().eq('id', id);
-  if(error){ alert('Erro: '+error.message); return; }
-  flashAdmin('Gasto excluído.');
-  loadGastosAdmin();
-}
-function flashAdmin(msg){
-  const ok = document.getElementById('okAdmin');
-  ok.textContent = msg; ok.className='alert ok'; ok.style.display='block';
-  setTimeout(()=>ok.style.display='none', 3000);
-}
-
-loadDashboard();
-</script>
-</body>
-</html>
+  i
