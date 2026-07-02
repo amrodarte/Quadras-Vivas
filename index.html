@@ -625,4 +625,79 @@ async function removerDoBimestre(id, bim){
   const {error} = restantes.length
     ? await db.from('contribuicoes').update({bimestres: restantes, valor: restantes.length*VALOR_BIMESTRE}).eq('id', id)
     : await db.from('contribuicoes').delete().eq('id', id);
-  i
+  if(error){ alert('Erro: '+error.message); return; }
+  flashAdmin(restantes.length ? `"${c.nome}" excluído de ${bim}.` : `Contribuição de "${c.nome}" excluída.`);
+  loadAprovadas();
+}
+async function verComprovante(path){
+  if(!path){ alert('Sem comprovante anexado.'); return; }
+  const {data, error} = await db.storage.from('comprovantes').download(path);
+  if(error){ alert('Erro ao abrir: '+error.message); return; }
+  window.open(URL.createObjectURL(data), '_blank');
+}
+async function decidir(id, status){
+  if(!confirm(`Confirmar: ${status}?`)) return;
+  const {error} = await db.from('contribuicoes').update({status, reviewed_at: new Date().toISOString()}).eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  document.getElementById('pend-'+id).remove();
+  flashAdmin(`Contribuição ${status}.`);
+  loadAprovadas();
+}
+
+/* ---- gastos (gestor) ---- */
+function bimestreDaData(iso){
+  const [ano, mes] = iso.split('-').map(Number);
+  return `${BIM_NOMES[Math.ceil(mes/2)-1]} (${ano})`;
+}
+async function lancarGasto(){
+  const err = document.getElementById('errGasto'); err.style.display='none';
+  const data = document.getElementById('gData').value;
+  const forn = document.getElementById('gForn').value.trim();
+  const desc = document.getElementById('gDesc').value.trim();
+  const valor = parseFloat(document.getElementById('gValor').value);
+  if(!data){ err.textContent='Informe a data do evento.'; err.style.display='block'; return; }
+  if(forn.length<2){ err.textContent='Informe o fornecedor.'; err.style.display='block'; return; }
+  if(!(valor>0)){ err.textContent='Informe um valor maior que zero.'; err.style.display='block'; return; }
+  const bim = bimestreDaData(data);
+  const {error} = await db.from('gastos').insert({data, fornecedor: forn, descricao: desc||null, valor, bimestre: bim});
+  if(error){ err.textContent='Erro: '+error.message; err.style.display='block'; return; }
+  document.getElementById('gForn').value=''; document.getElementById('gDesc').value=''; document.getElementById('gValor').value='';
+  flashAdmin('Gasto lançado.');
+  loadGastosAdmin();
+}
+async function loadGastosAdmin(){
+  const {data} = await db.from('gastos').select('*').order('data');
+  const el = document.getElementById('gAdminList');
+  if(!data || !data.length){ el.innerHTML = '<p class="muted">Nenhum gasto lançado.</p>'; return; }
+  const porBim = {};
+  data.forEach(g => (porBim[g.bimestre]=porBim[g.bimestre]||[]).push(g));
+  const bims = Object.keys(porBim).sort((a,b)=>ordBim(a)-ordBim(b));
+  el.innerHTML = bims.map(b=>{
+    const lst = porBim[b];
+    const tot = lst.reduce((s,g)=>s+Number(g.valor),0);
+    return `<details class="bloco">
+      <summary><span>${b}</span><span class="muted">${lst.length} · ${brl(tot)}</span></summary>
+      <div class="conteudo">${lst.map(g=>`<div class="g-admin">
+        <span>${dataBR(g.data)} · <strong>${esc(g.fornecedor)}</strong>${g.descricao?` — ${esc(g.descricao)}`:''}</span>
+        <span style="white-space:nowrap">${brl(g.valor)} <button title="Excluir" onclick="excluirGasto('${g.id}')">🗑</button></span>
+      </div>`).join('')}</div>
+    </details>`;
+  }).join('');
+}
+async function excluirGasto(id){
+  if(!confirm('Excluir este gasto?')) return;
+  const {error} = await db.from('gastos').delete().eq('id', id);
+  if(error){ alert('Erro: '+error.message); return; }
+  flashAdmin('Gasto excluído.');
+  loadGastosAdmin();
+}
+function flashAdmin(msg){
+  const ok = document.getElementById('okAdmin');
+  ok.textContent = msg; ok.className='alert ok'; ok.style.display='block';
+  setTimeout(()=>ok.style.display='none', 3000);
+}
+
+loadDashboard();
+</script>
+</body>
+</html>
