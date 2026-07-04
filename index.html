@@ -626,19 +626,28 @@ async function loadAprovadas(){
   if(!data.length){ el.innerHTML = '<p class="muted">Nenhuma contribuição aprovada ainda.</p>'; return; }
   const porBim = {};
   data.forEach(c => c.bimestres.forEach(b => { (porBim[b]=porBim[b]||[]).push(c); }));
-  const bims = Object.keys(porBim).sort((a,b)=>ordBim(a)-ordBim(b));
-  el.innerHTML = bims.map(b=>`<details class="bloco">
-      <summary><span>${b}</span><span class="muted">${porBim[b].length} contribuinte(s)</span></summary>
-      <div class="conteudo">${porBim[b].sort((x,y)=>x.nome.localeCompare(y.nome)).map(c=>`
-        <div class="g-admin">
-          <span><strong>${esc(c.nome)}</strong><br><span class="muted">📱 ${esc(c.telefone)}</span></span>
-          <span style="white-space:nowrap">
-            <button class="b-doc" title="Ver comprovante" onclick="verComprovante('${c.comprovante_path||''}')">📄</button>
-            <button title="Excluir deste bimestre" onclick="removerDoBimestre('${c.id}','${b}')">🗑</button>
-          </span>
-        </div>`).join('')}
-      </div>
-    </details>`).join('');
+  const anoDe3 = b => (b.match(/\((\d{4})\)/)||[])[1]||b;
+  const porAno = {};
+  Object.keys(porBim).forEach(b => { const a=anoDe3(b); (porAno[a]=porAno[a]||[]).push(b); });
+  el.innerHTML = Object.keys(porAno).sort().map(ano=>{
+    const bimsAno = porAno[ano].sort((a,b)=>ordBim(a)-ordBim(b));
+    const totAno = bimsAno.reduce((s,b)=>s+porBim[b].length,0);
+    return `<details class="bloco">
+      <summary><span>${ano}</span><span class="muted">${totAno} registro(s)</span></summary>
+      <div class="conteudo" style="padding-bottom:2px">${bimsAno.map(b=>`<details class="bloco">
+        <summary><span>${b}</span><span class="muted">${porBim[b].length} contribuinte(s)</span></summary>
+        <div class="conteudo">${porBim[b].sort((x,y)=>x.nome.localeCompare(y.nome)).map(c=>`
+          <div class="g-admin">
+            <span><strong>${esc(c.nome)}</strong><br><span class="muted">📱 ${esc(c.telefone)}</span></span>
+            <span style="white-space:nowrap">
+              <button class="b-doc" title="Ver comprovante" onclick="verComprovante('${c.comprovante_path||''}')">📄</button>
+              <button title="Excluir deste bimestre" onclick="removerDoBimestre('${c.id}','${b}')">🗑</button>
+            </span>
+          </div>`).join('')}
+        </div>
+      </details>`).join('')}</div>
+    </details>`;
+  }).join('');
 }
 async function removerDoBimestre(id, bim){
   const {data: c, error: e1} = await db.from('contribuicoes').select('*').eq('id', id).single();
